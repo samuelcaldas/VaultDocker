@@ -1,0 +1,17 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "vault-logo",
+      "description": "Abstract secure vault logo",
+      "imageUrl": "https://picsum.photos/seed/vault/200/200",
+      "imageHint": "security vault"
+    },
+    {
+      "id": "docker-node",
+      "description": "Abstract server nodes",
+      "imageUrl": "https://picsum.photos/seed/docker/800/600",
+      "imageHint": "server cluster"
+    }
+  ]
+}
