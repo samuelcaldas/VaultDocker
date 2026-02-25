@@ -2,7 +2,7 @@
     "files.autoSave": "afterDelay",
     "editor.accessibilityPageSize": 5000,
     "workbench.sideBar.location": "right",
-    "workbench.activityBar.location": "top",
+    "workbench.activityBar.location": "default",
     "window.commandCenter": true,
     "scm.defaultViewMode": "tree"
 }
