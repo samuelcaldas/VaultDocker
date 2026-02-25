@@ -4,7 +4,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'VaultDock - Docker Volume Backup Manager',
+  title: 'VaultDocker - Docker Volume Backup Manager',
   description: 'Secure and automated Docker volume backups.',
 };
 

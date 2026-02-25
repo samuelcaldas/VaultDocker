@@ -77,7 +77,7 @@ export function AppSidebar() {
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div className="flex flex-col gap-0.5 leading-none group-data-[collapsible=icon]:hidden">
-            <span className="font-headline font-bold text-foreground">VaultDock</span>
+            <span className="font-headline font-bold text-foreground">VaultDocker</span>
             <span className="text-xs text-muted-foreground font-medium">v1.0.0</span>
           </div>
         </div>

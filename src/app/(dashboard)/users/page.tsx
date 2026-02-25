@@ -31,9 +31,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 const users = [
-  { id: "1", name: "System Admin", email: "admin@vaultdock.local", role: "ADMIN", created: "2024-01-01", protected: true },
-  { id: "2", name: "Backup Operator", email: "op1@vaultdock.local", role: "OPERATOR", created: "2024-02-15", protected: false },
-  { id: "3", name: "Security Auditor", email: "audit@vaultdock.local", role: "OPERATOR", created: "2024-03-10", protected: false },
+  { id: "1", name: "System Admin", email: "admin@VaultDocker.local", role: "ADMIN", created: "2024-01-01", protected: true },
+  { id: "2", name: "Backup Operator", email: "op1@VaultDocker.local", role: "OPERATOR", created: "2024-02-15", protected: false },
+  { id: "3", name: "Security Auditor", email: "audit@VaultDocker.local", role: "OPERATOR", created: "2024-03-10", protected: false },
 ]
 
 export default function UsersPage() {

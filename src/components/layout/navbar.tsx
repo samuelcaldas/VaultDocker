@@ -32,7 +32,7 @@ export function Navbar() {
         </Badge>
         <div className="h-4 w-[1px] bg-border mx-1" />
         <nav className="flex items-center text-sm font-medium">
-          <span className="text-muted-foreground">VaultDock</span>
+          <span className="text-muted-foreground">VaultDocker</span>
           {segments.map((segment, index) => (
             <React.Fragment key={segment}>
               <ChevronRight className="mx-1 h-3.5 w-3.5 text-muted-foreground/50" />
@@ -69,7 +69,7 @@ export function Navbar() {
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">Admin User</p>
-                <p className="text-xs leading-none text-muted-foreground">admin@vaultdock.local</p>
+                <p className="text-xs leading-none text-muted-foreground">admin@VaultDocker.local</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

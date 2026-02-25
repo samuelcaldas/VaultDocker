@@ -1,4 +1,4 @@
-# **App Name**: VaultDock
+# **App Name**: VaultDocker
 
 ## Core Features:
 

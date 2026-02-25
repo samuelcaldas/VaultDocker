@@ -71,7 +71,7 @@ export default function VolumesPage() {
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle className="font-bold">Unmounted Volumes Detected</AlertTitle>
         <AlertDescription className="text-xs opacity-90">
-          Some volumes are not declared as external in VaultDock's <code>docker-compose.yml</code>. 
+          Some volumes are not declared as external in VaultDocker's <code>docker-compose.yml</code>. 
           They cannot be backed up until mounted read-only at <code>/mnt/volumes/&lt;name&gt;</code>.
         </AlertDescription>
       </Alert>
@@ -104,7 +104,7 @@ export default function VolumesPage() {
               <div className="relative mt-4">
                 <pre className="bg-muted p-4 rounded-lg font-code text-xs overflow-x-auto border border-border">
 {`services:
-  vaultdock:
+  VaultDocker:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - pg_data:/mnt/volumes/pg_data:ro
