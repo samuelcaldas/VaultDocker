@@ -36,10 +36,10 @@
     ];
     workspace = {
       onCreate = {
-        npm-install = "npm install -g @google/gemini-cli@latest @openai/codex@latest; exit;";
+        npm-install = "npm install -g @google/gemini-cli@latest @openai/codex@latest @github/copilot@prerelease; exit;";
       };
       onStart = {
-        npm-install = "npm install -g @google/gemini-cli@latest @openai/codex@latest; exit;";
+        npm-install = "npm install -g @google/gemini-cli@latest @openai/codex@latest @github/copilot@prerelease; exit;";
         # ldap = "lldap run";
       };
     };
