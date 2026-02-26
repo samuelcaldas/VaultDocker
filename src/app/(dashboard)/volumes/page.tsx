@@ -2,11 +2,11 @@
 "use client"
 
 import * as React from "react"
-import { 
-  Database, 
-  Search, 
-  ExternalLink, 
-  Play, 
+import {
+  Database,
+  Search,
+  ExternalLink,
+  Play,
   FolderSearch,
   AlertTriangle,
   Code2,
@@ -32,6 +32,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+} from "@/components/ui/card"
 import { toast } from "@/hooks/use-toast"
 
 const volumes = [
@@ -44,8 +49,8 @@ const volumes = [
 
 export default function VolumesPage() {
   const [search, setSearch] = React.useState("")
-  
-  const filteredVolumes = volumes.filter(v => 
+
+  const filteredVolumes = volumes.filter(v =>
     v.name.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -71,7 +76,7 @@ export default function VolumesPage() {
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle className="font-bold">Unmounted Volumes Detected</AlertTitle>
         <AlertDescription className="text-xs opacity-90">
-          Some volumes are not declared as external in VaultDocker's <code>docker-compose.yml</code>. 
+          Some volumes are not declared as external in VaultDocker's <code>docker-compose.yml</code>.
           They cannot be backed up until mounted read-only at <code>/mnt/volumes/&lt;name&gt;</code>.
         </AlertDescription>
       </Alert>
@@ -103,7 +108,7 @@ export default function VolumesPage() {
               </DialogHeader>
               <div className="relative mt-4">
                 <pre className="bg-muted p-4 rounded-lg font-code text-xs overflow-x-auto border border-border">
-{`services:
+                  {`services:
   VaultDocker:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -113,9 +118,9 @@ volumes:
   pg_data:
     external: true`}
                 </pre>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
+                <Button
+                  size="icon"
+                  variant="ghost"
                   className="absolute right-2 top-2 h-8 w-8"
                   onClick={copySnippet}
                 >
@@ -162,7 +167,7 @@ volumes:
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge 
+                    <Badge
                       variant={v.status === "MOUNTED" ? "default" : "secondary"}
                       className={v.status === "MOUNTED" ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-emerald-500/20" : "bg-muted text-muted-foreground"}
                     >

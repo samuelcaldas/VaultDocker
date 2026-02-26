@@ -2,11 +2,11 @@
 "use client"
 
 import * as React from "react"
-import { 
-  RefreshCw, 
-  Search, 
-  AlertTriangle, 
-  CheckCircle2, 
+import {
+  RefreshCw,
+  Search,
+  AlertTriangle,
+  CheckCircle2,
   Database,
   ArrowRight,
   ShieldAlert,
@@ -23,7 +23,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -97,8 +104,8 @@ export default function RestorePage() {
                 </TableHeader>
                 <TableBody>
                   {availableBackups.map((backup) => (
-                    <TableRow 
-                      key={backup.id} 
+                    <TableRow
+                      key={backup.id}
                       className={`group border-b border-border/50 cursor-pointer transition-colors ${selected === backup.id ? "bg-primary/5" : "hover:bg-muted/20"}`}
                       onClick={() => setSelected(backup.id)}
                     >
@@ -175,8 +182,8 @@ export default function RestorePage() {
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button 
-                    className="w-full shadow-lg shadow-primary/20" 
+                  <Button
+                    className="w-full shadow-lg shadow-primary/20"
                     disabled={!selected || restoring}
                   >
                     <RefreshCw className={`h-4 w-4 mr-2 ${restoring ? "animate-spin" : ""}`} />
@@ -190,7 +197,7 @@ export default function RestorePage() {
                       Critical Confirmation
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action will overwrite existing data in <code>/mnt/volumes/pg_data</code>. 
+                      This action will overwrite existing data in <code>/mnt/volumes/pg_data</code>.
                       Data integrity has been verified via SHA-256. This process is irreversible once started.
                     </AlertDialogDescription>
                   </AlertDialogHeader>

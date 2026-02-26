@@ -2,11 +2,11 @@
 "use client"
 
 import * as React from "react"
-import { 
-  Download, 
-  FileText, 
-  RefreshCw, 
-  Search, 
+import {
+  Download,
+  FileText,
+  RefreshCw,
+  Search,
   Copy,
   CheckCircle2,
   XCircle,
@@ -33,6 +33,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { summarizeBackupLogs } from "@/ai/flows/backup-log-summarizer-flow"
+import { Label } from "@/components/ui/label"
 import { toast } from "@/hooks/use-toast"
 
 const history = [
@@ -112,7 +113,7 @@ export default function HistoryPage() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge 
+                  <Badge
                     variant={run.status === "SUCCESS" ? "default" : "destructive"}
                     className={run.status === "SUCCESS" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : ""}
                   >
@@ -126,9 +127,9 @@ export default function HistoryPage() {
                     </Button>
                     <Sheet>
                       <SheetTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8 hover:text-accent"
                           onClick={() => {
                             setSummary("");
@@ -146,7 +147,7 @@ export default function HistoryPage() {
                           </SheetTitle>
                           <SheetDescription>Detailed output from the backup process on {run.date}.</SheetDescription>
                         </SheetHeader>
-                        
+
                         <div className="space-y-6">
                           <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
                             <div className="flex items-center gap-2 text-primary font-bold text-xs mb-3">
@@ -161,7 +162,7 @@ export default function HistoryPage() {
                           <div className="space-y-2">
                             <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Raw Output</Label>
                             <div className="font-code text-[11px] p-4 bg-muted border border-border rounded-lg h-[400px] overflow-auto whitespace-pre leading-relaxed">
-{`[2024-03-20 14:02:01] INFO: Initializing backup for volume pg_data
+                              {`[2024-03-20 14:02:01] INFO: Initializing backup for volume pg_data
 [2024-03-20 14:02:02] INFO: Scanning 1,402 files (total size: 2.4GB)
 [2024-03-20 14:02:05] INFO: Starting tar process (compression level: 6)
 [2024-03-20 14:03:30] INFO: Compression complete.
