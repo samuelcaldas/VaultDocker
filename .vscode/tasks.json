@@ -1,0 +1,64 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Next.js: Dev Server",
+            "type": "shell",
+            "command": "npm run dev",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "dev"
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "next",
+                "pattern": {
+                    "regexp": "^(.*)$",
+                    "file": 1,
+                    "message": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".*Starting.*",
+                    "endsPattern": ".*Ready.*|.*started server.*"
+                }
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Next.js: Type Check",
+            "type": "shell",
+            "command": "npm run typecheck",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$tsc"
+        },
+        {
+            "label": "Next.js: Lint",
+            "type": "shell",
+            "command": "npm run lint",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$eslint-stylish"
+        }
+    ]
+}
