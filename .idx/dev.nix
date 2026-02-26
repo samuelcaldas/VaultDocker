@@ -30,7 +30,6 @@
       "prisma.prisma"
       "redhat.vscode-yaml"
       "openai.chatgpt"
-      "google.geminicodeassist"
       "redhat.vscode-xml"
       "github.copilot"
     ];
