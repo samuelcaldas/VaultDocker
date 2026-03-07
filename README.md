@@ -8,6 +8,7 @@ VaultDocker is a Next.js 15 + TypeScript dashboard for managing Docker volume ba
 - [Project Status](#project-status)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
+- [Docker](#docker)
 - [Available Scripts](#available-scripts)
 - [Environment Variables](#environment-variables)
 - [Project Structure](#project-structure)
@@ -66,6 +67,55 @@ The app runs on `http://localhost:9002`.
 npm run build
 npm run start
 ```
+
+## Docker
+
+Production containerization is provided with a multi-stage build and a distroless runtime:
+
+- `deps` stage: installs dependencies with `npm ci`.
+- `migrator` stage: runs Prisma CLI commands (for `migrate deploy`).
+- `builder` stage: compiles Next.js with `output: "standalone"`.
+- `runner` stage: runs on `gcr.io/distroless/nodejs20-debian12:nonroot`.
+
+### Build image
+
+```bash
+docker build -t vaultdocker:distroless .
+```
+
+### Build migrator image (one-time DB migrations)
+
+```bash
+docker build --target migrator -t vaultdocker:migrator .
+```
+
+### Apply migrations to a mounted persistent database (optional)
+
+```bash
+docker run --rm \
+  -e DATABASE_URL=file:/data/dev.db \
+  -v /path/to/vaultdocker-data:/data \
+  vaultdocker:migrator migrate deploy
+```
+
+### Run container
+
+```bash
+docker run --rm \
+  -p 9002:9002 \
+  -e NEXTAUTH_SECRET=replace-with-long-random-secret \
+  -e APP_ENCRYPTION_KEY=replace-with-64-char-hex-key \
+  -e DEFAULT_ADMIN_PASSWORD=change-me \
+  vaultdocker:distroless
+```
+
+Container defaults:
+
+- `PORT=9002`
+- `DATABASE_URL=file:/data/dev.db`
+- `LOCAL_BACKUP_PATH=/data/backups`
+- The image includes a pre-migrated internal SQLite DB for first boot.
+- For persistent external storage, mount a host path writable by UID `65532` (distroless non-root user) and run migrations against that mount.
 
 ## Available Scripts
 

@@ -2,6 +2,7 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: 'standalone',
   serverExternalPackages: ['ssh2', 'ssh2-sftp-client'],
   images: {
     remotePatterns: [
