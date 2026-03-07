@@ -2,8 +2,10 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Bell, User, LogOut, Settings as SettingsIcon, ChevronRight } from "lucide-react"
+import { signOut, useSession } from "next-auth/react"
 
 import {
   DropdownMenu,
@@ -20,6 +22,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 
 export function Navbar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
   const segments = pathname.split("/").filter(Boolean)
 
   return (
@@ -60,33 +63,40 @@ export function Navbar() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8 border border-border">
-                <AvatarImage src="https://picsum.photos/seed/user1/32/32" alt="Admin" />
-                <AvatarFallback>AD</AvatarFallback>
+                <AvatarImage src={`https://picsum.photos/seed/${session?.user?.id ?? "user"}/32/32`} alt={session?.user?.name ?? "User"} />
+                <AvatarFallback>
+                  {session?.user?.name?.split(" ").map((name) => name[0]).join("").slice(0, 2) ?? "U"}
+                </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">Admin User</p>
-                <p className="text-xs leading-none text-muted-foreground">admin@VaultDocker.local</p>
+                <p className="text-sm font-medium leading-none">{session?.user?.name ?? "User"}</p>
+                <p className="text-xs leading-none text-muted-foreground">{session?.user?.email ?? "Unknown"}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <a href="/profile" className="flex items-center gap-2">
+              <Link href="/profile" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
                 <span>Profile</span>
-              </a>
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <a href="/settings" className="flex items-center gap-2">
-                <SettingsIcon className="h-4 w-4" />
-                <span>Settings</span>
-              </a>
-            </DropdownMenuItem>
+            {session?.user?.role === "ADMIN" && (
+              <DropdownMenuItem asChild>
+                <Link href="/settings" className="flex items-center gap-2">
+                  <SettingsIcon className="h-4 w-4" />
+                  <span>Settings</span>
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+            >
               <LogOut className="h-4 w-4 mr-2" />
               <span>Log out</span>
             </DropdownMenuItem>

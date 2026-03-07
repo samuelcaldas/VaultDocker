@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+}
+
+enum ProviderType {
+  LOCAL
+}
+
+enum BackupRunStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id                 String            @id @default(cuid())
+  email              String            @unique
+  name               String
+  passwordHash       String
+  role               Role              @default(OPERATOR)
+  isProtected        Boolean           @default(false)
+  mustChangePassword Boolean           @default(false)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  storageProviders   StorageProvider[]
+}
+
+model Volume {
+  id           String      @id @default(cuid())
+  dockerName   String      @unique
+  mountPath    String
+  driver       String
+  sizeBytes    BigInt?
+  containers   Json
+  lastSeenAt   DateTime    @default(now())
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  jobs         BackupJob[]
+}
+
+model StorageProvider {
+  id              String      @id @default(cuid())
+  name            String
+  type            ProviderType
+  configEncrypted String
+  testedAt        DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  jobs            BackupJob[]
+}
+
+model BackupJob {
+  id                String         @id @default(cuid())
+  name              String
+  volumeId          String
+  storageProviderId String
+  selectedPaths     Json
+  exclusionGlobs    Json
+  cronExpression    String
+  nameFormat        String
+  compressionLevel  Int
+  retentionCount    Int
+  enabled           Boolean        @default(true)
+  lastRunAt         DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  volume            Volume         @relation(fields: [volumeId], references: [id], onDelete: Cascade)
+  storageProvider   StorageProvider @relation(fields: [storageProviderId], references: [id], onDelete: Restrict)
+  runs              BackupRun[]
+}
+
+model BackupRun {
+  id            String          @id @default(cuid())
+  jobId          String
+  trigger        String
+  status         BackupRunStatus
+  startedAt      DateTime        @default(now())
+  finishedAt     DateTime?
+  archivePath    String?
+  fileSizeBytes  BigInt?
+  checksum       String?
+  logs           String?
+  errorMessage   String?
+  backupName     String?
+  storagePath    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  job            BackupJob       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model Settings {
+  id                    Int      @id
+  appName               String   @default("VaultDocker")
+  timezone              String   @default("UTC")
+  defaultCompression    Int      @default(6)
+  webhookUrl            String?
+  notifyOnFailure       Boolean  @default(true)
+  notifyOnSuccess       Boolean  @default(false)
+  sessionTimeoutMinutes Int      @default(60)
+  updatedAt             DateTime @updatedAt
+}

@@ -4,6 +4,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { 
   LayoutDashboard, 
   Database, 
@@ -68,6 +69,8 @@ const navigation = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const canViewAdmin = session?.user?.role === "ADMIN"
 
   return (
     <Sidebar variant="sidebar" collapsible="icon">
@@ -83,7 +86,9 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        {navigation.map((group) => (
+        {navigation
+          .filter((group) => (group.label === "Admin" ? canViewAdmin : true))
+          .map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel className="font-headline font-semibold text-muted-foreground/50 uppercase tracking-wider text-[10px]">
               {group.label}
