@@ -1,8 +1,10 @@
 import { NextRequest } from 'next/server';
+import { ProviderType } from '@prisma/client';
 import { StorageProviderService } from '@/server/services/storage-provider-service';
 import { ensureRuntimeReady } from '@/server/runtime';
 import { requireAuthUser } from '@/server/api-auth';
 import { badRequest, ok, unauthorized, serverError } from '@/server/http';
+import type { StorageProviderConfig } from '@/server/storage/types';
 
 const service = new StorageProviderService();
 
@@ -28,16 +30,22 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as {
       name?: string;
-      basePath?: string;
+      type?: string;
+      config?: unknown;
     };
 
-    if (!body.name || !body.basePath) {
-      return badRequest('name and basePath are required.');
+    if (!body.name || !body.type || body.config === undefined) {
+      return badRequest('name, type, and config are required.');
     }
 
-    const provider = await service.createLocalProvider({
+    if (!Object.values(ProviderType).includes(body.type as ProviderType)) {
+      return badRequest(`type must be one of: ${Object.values(ProviderType).join(', ')}`);
+    }
+
+    const provider = await service.create({
       name: body.name,
-      basePath: body.basePath,
+      type: body.type as ProviderType,
+      config: body.config as StorageProviderConfig,
       userId: user.id,
     });
 

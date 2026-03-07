@@ -1,17 +1,22 @@
-import { createHash } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { createReadStream, createWriteStream } from 'fs';
 import { mkdir, rm, stat, writeFile } from 'fs/promises';
 import path from 'path';
 import { spawn } from 'child_process';
 import { BackupRunStatus, ProviderType } from '@prisma/client';
-import { decryptJson } from '@/server/crypto';
+import type { StorageAdapter } from '@/server/storage/storage-adapter';
+import type { StorageProviderConfig } from '@/server/storage/types';
 import { BackupJobRepository } from '@/server/repositories/backup-job-repository';
 import { BackupRunRepository } from '@/server/repositories/backup-run-repository';
+import { StorageProviderService } from '@/server/services/storage-provider-service';
 
 const MAX_ATTEMPTS = 3;
+const TEMP_ARCHIVE_ROOT = process.env.BACKUP_WORKDIR ?? '/tmp/vaultdocker-work';
 
-type LocalProviderConfig = {
-  basePath: string;
+type RunWorkspace = {
+  directoryPath: string;
+  archivePath: string;
+  sidecarPath: string;
 };
 
 function sleep(milliseconds: number): Promise<void> {
@@ -84,7 +89,6 @@ async function runArchiveCommand(input: {
 
   const selected = input.selectedPaths.length > 0 ? input.selectedPaths : ['.'];
   const excludes = input.exclusionGlobs.filter(Boolean).map((glob) => `--exclude=${glob}`);
-
   const tarArgs = ['-cf', '-', '-C', input.sourcePath, ...excludes, ...selected];
 
   const tarProcess = spawn('tar', tarArgs, {
@@ -96,7 +100,6 @@ async function runArchiveCommand(input: {
   });
 
   const output = createWriteStream(input.archivePath);
-
   let logs = `Running tar ${tarArgs.join(' ')}\n`;
 
   tarProcess.stderr?.on('data', (chunk) => {
@@ -120,9 +123,25 @@ async function runArchiveCommand(input: {
   return logs;
 }
 
+function createWorkspace(id: string): RunWorkspace {
+  const directoryPath = path.join(TEMP_ARCHIVE_ROOT, id);
+  const archivePath = path.join(directoryPath, 'archive.tar.gz');
+
+  return {
+    directoryPath,
+    archivePath,
+    sidecarPath: `${archivePath}.sha256`,
+  };
+}
+
+async function cleanupWorkspace(workspace: RunWorkspace): Promise<void> {
+  await rm(workspace.directoryPath, { recursive: true, force: true });
+}
+
 export class BackupService {
   private readonly jobRepository = new BackupJobRepository();
   private readonly runRepository = new BackupRunRepository();
+  private readonly storageProviderService = new StorageProviderService();
 
   async listRuns(input: { jobId?: string; status?: BackupRunStatus; limit?: number } = {}) {
     return this.runRepository.list(input);
@@ -138,11 +157,8 @@ export class BackupService {
       throw new Error('Backup job not found.');
     }
 
-    if (job.storageProvider.type !== ProviderType.LOCAL) {
-      throw new Error('Only LOCAL storage providers are supported in this release.');
-    }
-
-    const localConfig = decryptJson<LocalProviderConfig>(job.storageProvider.configEncrypted);
+    const adapter = this.storageProviderService.getAdapter(job.storageProvider.type);
+    const storageConfig = this.storageProviderService.decodeConfig(job.storageProvider);
     const successfulRuns = await this.runRepository.listSuccessfulByJob(job.id);
     const sequence = String(successfulRuns.length + 1).padStart(3, '0');
 
@@ -152,15 +168,15 @@ export class BackupService {
       seq: sequence,
     });
 
-    const archivePath = path.join(localConfig.basePath, backupName);
-    const sidecarPath = `${archivePath}.sha256`;
-
     const run = await this.runRepository.create({
       jobId: job.id,
       trigger,
       status: BackupRunStatus.RUNNING,
       logs: `Starting backup for job ${job.name}...\n`,
     });
+
+    const workspace = createWorkspace(run.id);
+    await mkdir(workspace.directoryPath, { recursive: true });
 
     const selectedPaths = Array.isArray(job.selectedPaths) ? job.selectedPaths.filter((entry): entry is string => typeof entry === 'string') : [];
     const exclusionGlobs = Array.isArray(job.exclusionGlobs)
@@ -178,21 +194,31 @@ export class BackupService {
           selectedPaths,
           exclusionGlobs,
           compressionLevel: job.compressionLevel,
-          archivePath,
+          archivePath: workspace.archivePath,
         });
 
         combinedLogs += archiveLogs;
 
-        const checksum = await computeSha256(archivePath);
-        await writeFile(sidecarPath, `${checksum}  ${path.basename(archivePath)}\n`, 'utf8');
+        const checksum = await computeSha256(workspace.archivePath);
+        await writeFile(workspace.sidecarPath, `${checksum}  ${backupName}\n`, 'utf8');
 
-        const fileStat = await stat(archivePath);
+        const uploadedArchive = await adapter.upload(storageConfig, {
+          localPath: workspace.archivePath,
+          remotePath: backupName,
+        });
+
+        await adapter.upload(storageConfig, {
+          localPath: workspace.sidecarPath,
+          remotePath: `${backupName}.sha256`,
+        });
+
+        const fileStat = await stat(workspace.archivePath);
 
         await this.runRepository.update(run.id, {
           status: BackupRunStatus.SUCCESS,
           finishedAt: new Date(),
-          archivePath,
-          storagePath: archivePath,
+          archivePath: null,
+          storagePath: uploadedArchive.storagePath,
           fileSizeBytes: BigInt(fileStat.size),
           checksum,
           logs: `${combinedLogs}Backup completed successfully.\n`,
@@ -203,19 +229,20 @@ export class BackupService {
           lastRunAt: new Date(),
         });
 
-        await this.applyRetention(job.id, job.retentionCount);
+        await this.applyRetention(job.id, job.retentionCount, adapter, storageConfig);
+        await cleanupWorkspace(workspace);
 
         return this.runRepository.findById(run.id);
       } catch (error) {
         const message = (error as Error).message;
         combinedLogs += `Attempt ${attempt} failed: ${message}\n`;
 
-        await rm(archivePath, { force: true }).catch(() => undefined);
-        await rm(sidecarPath, { force: true }).catch(() => undefined);
+        await cleanupWorkspace(workspace);
 
         if (attempt < MAX_ATTEMPTS) {
           const waitMs = 2 ** attempt * 1000;
           combinedLogs += `Retrying in ${waitMs}ms...\n`;
+          await mkdir(workspace.directoryPath, { recursive: true });
           await sleep(waitMs);
           continue;
         }
@@ -234,32 +261,97 @@ export class BackupService {
     throw new Error('Backup failed after maximum attempts.');
   }
 
-  async createSafetyBackup(input: { sourcePath: string; destinationDir: string; volumeName: string }) {
+  async createSafetyBackup(input: {
+    sourcePath: string;
+    volumeName: string;
+    jobName: string;
+    providerType: ProviderType;
+    storageConfig: StorageProviderConfig;
+  }) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const safetyName = `safety_${sanitizePathSegment(input.volumeName)}_${timestamp}.tar.gz`;
-    const archivePath = path.join(input.destinationDir, safetyName);
+    const safetyName = `safety_${sanitizePathSegment(input.jobName)}_${sanitizePathSegment(input.volumeName)}_${timestamp}.tar.gz`;
+    const workspace = createWorkspace(`safety-${randomUUID()}`);
 
-    await runArchiveCommand({
-      sourcePath: input.sourcePath,
-      selectedPaths: ['.'],
-      exclusionGlobs: [],
-      compressionLevel: 6,
-      archivePath,
-    });
+    await mkdir(workspace.directoryPath, { recursive: true });
 
-    return archivePath;
+    try {
+      await runArchiveCommand({
+        sourcePath: input.sourcePath,
+        selectedPaths: ['.'],
+        exclusionGlobs: [],
+        compressionLevel: 6,
+        archivePath: workspace.archivePath,
+      });
+
+      const checksum = await computeSha256(workspace.archivePath);
+      await writeFile(workspace.sidecarPath, `${checksum}  ${safetyName}\n`, 'utf8');
+
+      const adapter = this.storageProviderService.getAdapter(input.providerType);
+      const uploadedArchive = await adapter.upload(input.storageConfig, {
+        localPath: workspace.archivePath,
+        remotePath: safetyName,
+      });
+
+      await adapter.upload(input.storageConfig, {
+        localPath: workspace.sidecarPath,
+        remotePath: `${safetyName}.sha256`,
+      });
+
+      await cleanupWorkspace(workspace);
+
+      return {
+        storagePath: uploadedArchive.storagePath,
+        checksum,
+      };
+    } catch (error) {
+      await cleanupWorkspace(workspace);
+      throw error;
+    }
   }
 
-  private async applyRetention(jobId: string, retentionCount: number) {
+  async downloadRunToLocal(runId: string, localPath: string) {
+    const run = await this.runRepository.findById(runId);
+    if (!run?.storagePath) {
+      throw new Error('Backup storage path not found for this run.');
+    }
+
+    const job = await this.jobRepository.findByIdWithRelations(run.jobId);
+    if (!job) {
+      throw new Error('Backup job not found.');
+    }
+
+    const storageConfig = this.storageProviderService.decodeConfig(job.storageProvider);
+    const adapter = this.storageProviderService.getAdapter(job.storageProvider.type);
+
+    await adapter.download(storageConfig, {
+      remotePath: run.storagePath,
+      localPath,
+    });
+
+    return {
+      run,
+      job,
+    };
+  }
+
+  private async applyRetention(
+    jobId: string,
+    retentionCount: number,
+    adapter: StorageAdapter,
+    storageConfig: StorageProviderConfig,
+  ) {
     const keep = Math.max(1, retentionCount);
     const successfulRuns = await this.runRepository.listSuccessfulByJob(jobId);
-
     const staleRuns = successfulRuns.slice(keep);
 
     for (const stale of staleRuns) {
+      if (stale.storagePath) {
+        await adapter.delete(storageConfig, { remotePath: stale.storagePath }).catch(() => undefined);
+        await adapter.delete(storageConfig, { remotePath: `${stale.storagePath}.sha256` }).catch(() => undefined);
+      }
+
       if (stale.archivePath) {
         await rm(stale.archivePath, { force: true }).catch(() => undefined);
-        await rm(`${stale.archivePath}.sha256`, { force: true }).catch(() => undefined);
       }
 
       await this.runRepository.delete(stale.id);

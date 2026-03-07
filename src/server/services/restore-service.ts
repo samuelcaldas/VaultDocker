@@ -1,17 +1,19 @@
-import { createHash } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { createReadStream } from 'fs';
-import { access, mkdir } from 'fs/promises';
+import { access, mkdir, rm } from 'fs/promises';
 import { spawn } from 'child_process';
 import path from 'path';
 import { constants as fsConstants } from 'fs';
-import { ProviderType } from '@prisma/client';
-import { decryptJson } from '@/server/crypto';
-import { BackupRunRepository } from '@/server/repositories/backup-run-repository';
 import { BackupJobRepository } from '@/server/repositories/backup-job-repository';
+import { BackupRunRepository } from '@/server/repositories/backup-run-repository';
 import { BackupService } from '@/server/services/backup-service';
+import { StorageProviderService } from '@/server/services/storage-provider-service';
 
-type LocalProviderConfig = {
-  basePath: string;
+const TEMP_RESTORE_ROOT = process.env.BACKUP_RESTORE_WORKDIR ?? '/tmp/vaultdocker-work/restore';
+
+type RestoreArchiveLocation = {
+  archivePath: string;
+  cleanupDir: string | null;
 };
 
 async function waitForProcess(process: ReturnType<typeof spawn>, label: string): Promise<void> {
@@ -34,21 +36,28 @@ async function waitForProcess(process: ReturnType<typeof spawn>, label: string):
 async function checksumForFile(filePath: string): Promise<string> {
   const hash = createHash('sha256');
   const stream = createReadStream(filePath);
+
   for await (const chunk of stream) {
     hash.update(chunk);
   }
+
   return hash.digest('hex');
+}
+
+function ensureTarName(name: string): string {
+  return name.endsWith('.tar.gz') ? name : `${name}.tar.gz`;
 }
 
 export class RestoreService {
   private readonly runRepository = new BackupRunRepository();
   private readonly jobRepository = new BackupJobRepository();
   private readonly backupService = new BackupService();
+  private readonly storageProviderService = new StorageProviderService();
 
   async restoreRun(runId: string, options: { safetyBackup: boolean }) {
     const run = await this.runRepository.findById(runId);
-    if (!run?.archivePath) {
-      throw new Error('Backup archive not found for this run.');
+    if (!run) {
+      throw new Error('Backup run not found.');
     }
 
     const job = await this.jobRepository.findByIdWithRelations(run.jobId);
@@ -56,49 +65,86 @@ export class RestoreService {
       throw new Error('Backup job not found.');
     }
 
-    if (job.storageProvider.type !== ProviderType.LOCAL) {
-      throw new Error('Only LOCAL storage providers are supported in this release.');
-    }
+    const archive = await this.resolveArchive(run.id, run.storagePath, run.archivePath, run.backupName);
 
-    const localConfig = decryptJson<LocalProviderConfig>(job.storageProvider.configEncrypted);
+    try {
+      const actualChecksum = await checksumForFile(archive.archivePath);
+      if (run.checksum && run.checksum !== actualChecksum) {
+        throw new Error('Checksum verification failed. Restore blocked.');
+      }
 
-    await access(run.archivePath, fsConstants.R_OK);
+      await mkdir(job.volume.mountPath, { recursive: true });
 
-    const actualChecksum = await checksumForFile(run.archivePath);
-    if (!run.checksum || run.checksum !== actualChecksum) {
-      throw new Error('Checksum verification failed. Restore blocked.');
-    }
+      if (options.safetyBackup) {
+        const storageConfig = this.storageProviderService.decodeConfig(job.storageProvider);
 
-    await mkdir(job.volume.mountPath, { recursive: true });
+        await this.backupService.createSafetyBackup({
+          sourcePath: job.volume.mountPath,
+          volumeName: job.volume.dockerName,
+          jobName: job.name,
+          providerType: job.storageProvider.type,
+          storageConfig,
+        });
+      }
 
-    if (options.safetyBackup) {
-      await this.backupService.createSafetyBackup({
-        sourcePath: job.volume.mountPath,
-        destinationDir: localConfig.basePath,
-        volumeName: job.volume.dockerName,
+      const extract = spawn('tar', ['-xzf', archive.archivePath, '-C', job.volume.mountPath], {
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
+
+      let logs = '';
+      extract.stdout?.on('data', (chunk) => {
+        logs += chunk.toString();
+      });
+      extract.stderr?.on('data', (chunk) => {
+        logs += chunk.toString();
+      });
+
+      await waitForProcess(extract, 'restore-tar');
+
+      return {
+        ok: true,
+        checksum: actualChecksum,
+        logs,
+        restoredTo: job.volume.mountPath,
+        sourceArchive: path.basename(archive.archivePath),
+      };
+    } finally {
+      if (archive.cleanupDir) {
+        await rm(archive.cleanupDir, { recursive: true, force: true });
+      }
+    }
+  }
+
+  private async resolveArchive(
+    runId: string,
+    storagePath: string | null,
+    archivePath: string | null,
+    backupName: string | null,
+  ): Promise<RestoreArchiveLocation> {
+    if (storagePath) {
+      const tempDir = path.join(TEMP_RESTORE_ROOT, `${runId}-${randomUUID()}`);
+      const targetName = ensureTarName(backupName ?? `run-${runId}`);
+      const tempArchivePath = path.join(tempDir, targetName);
+
+      await mkdir(tempDir, { recursive: true });
+      await this.backupService.downloadRunToLocal(runId, tempArchivePath);
+      await access(tempArchivePath, fsConstants.R_OK);
+
+      return {
+        archivePath: tempArchivePath,
+        cleanupDir: tempDir,
+      };
     }
 
-    const extract = spawn('tar', ['-xzf', run.archivePath, '-C', job.volume.mountPath], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    if (!archivePath) {
+      throw new Error('Backup archive not found for this run.');
+    }
 
-    let logs = '';
-    extract.stdout?.on('data', (chunk) => {
-      logs += chunk.toString();
-    });
-    extract.stderr?.on('data', (chunk) => {
-      logs += chunk.toString();
-    });
-
-    await waitForProcess(extract, 'restore-tar');
+    await access(archivePath, fsConstants.R_OK);
 
     return {
-      ok: true,
-      checksum: actualChecksum,
-      logs,
-      restoredTo: job.volume.mountPath,
-      sourceArchive: path.basename(run.archivePath),
+      archivePath,
+      cleanupDir: null,
     };
   }
 }

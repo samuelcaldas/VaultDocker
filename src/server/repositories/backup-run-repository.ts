@@ -1,8 +1,15 @@
 import { BackupRunStatus, type BackupRun } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { db } from '@/server/db';
 
+type RunWithJob = Prisma.BackupRunGetPayload<{
+  include: {
+    job: true;
+  };
+}>;
+
 export class BackupRunRepository {
-  async list(filters: { jobId?: string; status?: BackupRunStatus; limit?: number } = {}): Promise<(BackupRun & { job: { id: string; name: string; volumeId: string; storageProviderId: string; selectedPaths: unknown; exclusionGlobs: unknown; cronExpression: string; nameFormat: string; compressionLevel: number; retentionCount: number; enabled: boolean; lastRunAt: Date | null; createdAt: Date; updatedAt: Date }; })[]> {
+  async list(filters: { jobId?: string; status?: BackupRunStatus; limit?: number } = {}): Promise<RunWithJob[]> {
     return db.backupRun.findMany({
       where: {
         jobId: filters.jobId,
@@ -16,7 +23,7 @@ export class BackupRunRepository {
     });
   }
 
-  async findById(id: string): Promise<(BackupRun & { job: { id: string; name: string; volumeId: string; storageProviderId: string; selectedPaths: unknown; exclusionGlobs: unknown; cronExpression: string; nameFormat: string; compressionLevel: number; retentionCount: number; enabled: boolean; lastRunAt: Date | null; createdAt: Date; updatedAt: Date } }) | null> {
+  async findById(id: string): Promise<RunWithJob | null> {
     return db.backupRun.findUnique({
       where: { id },
       include: { job: true },
@@ -41,14 +48,14 @@ export class BackupRunRepository {
 
   async update(id: string, input: Partial<{
     status: BackupRunStatus;
-    finishedAt: Date;
-    archivePath: string;
+    finishedAt: Date | null;
+    archivePath: string | null;
     fileSizeBytes: bigint;
-    checksum: string;
-    logs: string;
-    errorMessage: string;
-    backupName: string;
-    storagePath: string;
+    checksum: string | null;
+    logs: string | null;
+    errorMessage: string | null;
+    backupName: string | null;
+    storagePath: string | null;
   }>): Promise<BackupRun> {
     return db.backupRun.update({ where: { id }, data: input });
   }

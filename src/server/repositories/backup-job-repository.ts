@@ -1,12 +1,31 @@
 import type { BackupJob, Prisma } from '@prisma/client';
 import { db } from '@/server/db';
 
+type JobWithVolumeAndProvider = Prisma.BackupJobGetPayload<{
+  include: {
+    volume: true;
+    storageProvider: true;
+  };
+}>;
+
+type JobListWithRelations = Prisma.BackupJobGetPayload<{
+  include: {
+    volume: true;
+    storageProvider: true;
+    runs: {
+      take: 1;
+      orderBy: { startedAt: 'desc' };
+      select: {
+        id: true;
+        status: true;
+        startedAt: true;
+      };
+    };
+  };
+}>;
+
 export class BackupJobRepository {
-  async listWithRelations(): Promise<(BackupJob & {
-    volume: { id: string; dockerName: string; mountPath: string; driver: string; sizeBytes: bigint | null; containers: Prisma.JsonValue; lastSeenAt: Date; createdAt: Date; updatedAt: Date };
-    storageProvider: { id: string; name: string; type: string; configEncrypted: string; testedAt: Date | null; createdAt: Date; updatedAt: Date; userId: string | null };
-    runs: { id: string; status: string; startedAt: Date }[];
-  })[]> {
+  async listWithRelations(): Promise<JobListWithRelations[]> {
     return db.backupJob.findMany({
       include: {
         volume: true,
@@ -33,10 +52,7 @@ export class BackupJobRepository {
     return db.backupJob.findUnique({ where: { id } });
   }
 
-  async findByIdWithRelations(id: string): Promise<(BackupJob & {
-    volume: { id: string; dockerName: string; mountPath: string; driver: string; sizeBytes: bigint | null; containers: Prisma.JsonValue; lastSeenAt: Date; createdAt: Date; updatedAt: Date };
-    storageProvider: { id: string; name: string; type: string; configEncrypted: string; testedAt: Date | null; createdAt: Date; updatedAt: Date; userId: string | null };
-  }) | null> {
+  async findByIdWithRelations(id: string): Promise<JobWithVolumeAndProvider | null> {
     return db.backupJob.findUnique({
       where: { id },
       include: {

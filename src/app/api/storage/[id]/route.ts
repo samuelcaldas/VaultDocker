@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { StorageProviderService } from '@/server/services/storage-provider-service';
 import { ensureRuntimeReady } from '@/server/runtime';
 import { requireAuthUser } from '@/server/api-auth';
-import { ok, unauthorized, notFound, serverError } from '@/server/http';
+import { badRequest, ok, unauthorized, notFound, serverError } from '@/server/http';
 
 const service = new StorageProviderService();
 
@@ -14,10 +14,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params;
     const body = (await request.json()) as {
       name?: string;
-      basePath?: string;
+      config?: unknown;
     };
 
-    const updated = await service.updateLocalProvider(id, body);
+    if (body.name === undefined && body.config === undefined) {
+      return badRequest('At least one of name or config is required.');
+    }
+
+    if (body.config !== undefined && (typeof body.config !== 'object' || body.config === null || Array.isArray(body.config))) {
+      return badRequest('config must be an object when provided.');
+    }
+
+    const updated = await service.update(id, {
+      name: body.name,
+      config: body.config as Record<string, unknown> | undefined,
+    });
     if (!updated) {
       return notFound('Storage provider not found.');
     }

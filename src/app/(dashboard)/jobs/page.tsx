@@ -39,7 +39,7 @@ type Volume = {
 type Provider = {
   id: string;
   name: string;
-  type: 'LOCAL';
+  type: 'LOCAL' | 'S3' | 'SMB' | 'FTP' | 'SFTP';
 };
 
 type TreeEntry = {
@@ -175,7 +175,7 @@ export default function JobsPage() {
         jobName: form.name,
         volumeName: selectedVolume.dockerName,
         availableTokens: ['{job}', '{volume}', '{date}', '{time}', '{timestamp}', '{seq}'],
-        description: 'Local provider backup',
+        description: 'Provider-backed backup',
       });
       setSuggestedFormats(result.suggestedFormats ?? []);
     } catch (error) {
