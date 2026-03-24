@@ -36,11 +36,7 @@ export class StorageProviderService {
 
   async create(input: CreateStorageProviderInput): Promise<StorageProviderView> {
     const config = this.validator.parseTypedConfig(input.type, input.config);
-
-    if (input.type === ProviderType.LOCAL) {
-      const localConfig = this.validator.parseLocal(config);
-      await mkdir(localConfig.basePath, { recursive: true });
-    }
+    await this.ensureLocalDirectory(input.type, config);
 
     const provider = await this.repository.create({
       name: input.name,
@@ -59,17 +55,8 @@ export class StorageProviderService {
       return null;
     }
 
-    const currentConfig = this.decodeConfig(existing);
-    const configPatch = input.config ? this.asConfigPatch(input.config) : {};
-    const nextConfig = this.validator.parseTypedConfig(existing.type, {
-      ...currentConfig,
-      ...configPatch,
-    });
-
-    if (existing.type === ProviderType.LOCAL) {
-      const localConfig = this.validator.parseLocal(nextConfig);
-      await mkdir(localConfig.basePath, { recursive: true });
-    }
+    const nextConfig = this.buildNextConfig(existing, input.config);
+    await this.ensureLocalDirectory(existing.type, nextConfig);
 
     const updated = await this.repository.update(id, {
       name: input.name,
@@ -77,6 +64,23 @@ export class StorageProviderService {
     });
 
     return this.toView(updated);
+  }
+
+  private buildNextConfig(existing: StorageProvider, patchConfig: unknown): StorageProviderConfig {
+    const currentConfig = this.decodeConfig(existing);
+    const configPatch = patchConfig ? this.asConfigPatch(patchConfig) : {};
+    return this.validator.parseTypedConfig(existing.type, {
+      ...currentConfig,
+      ...configPatch,
+    });
+  }
+
+  private async ensureLocalDirectory(type: ProviderType, config: StorageProviderConfig): Promise<void> {
+    if (type !== ProviderType.LOCAL) {
+      return;
+    }
+    const localConfig = this.validator.parseLocal(config);
+    await mkdir(localConfig.basePath, { recursive: true });
   }
 
   async testConnection(id: string): Promise<{ ok: boolean; message: string }> {
@@ -89,17 +93,24 @@ export class StorageProviderService {
       };
     }
 
+    return this.performTestConnection(existing);
+  }
+
+  private async performTestConnection(existing: StorageProvider) {
     const config = this.decodeConfig(existing);
     const adapter = this.adapterFactory.get(existing.type);
     const result = await adapter.testConnection(config);
-
-    if (result.ok) {
-      await this.repository.update(id, {
-        testedAt: new Date(),
-      });
-    }
-
+    await this.markTestedIfOk(existing.id, result.ok);
     return result;
+  }
+
+  private async markTestedIfOk(id: string, isOk: boolean) {
+    if (!isOk) {
+      return;
+    }
+    await this.repository.update(id, {
+      testedAt: new Date(),
+    });
   }
 
   async delete(id: string): Promise<void> {
@@ -127,28 +138,22 @@ export class StorageProviderService {
     try {
       const config = this.decodeConfig(provider);
       const redacted = this.redactor.redact(provider.type, config);
-
-      return {
-        id: provider.id,
-        name: provider.name,
-        type: provider.type,
-        testedAt: provider.testedAt,
-        createdAt: provider.createdAt,
-        updatedAt: provider.updatedAt,
-        userId: provider.userId,
-        config: redacted,
-      };
+      return this.buildView(provider, redacted);
     } catch {
-      return {
-        id: provider.id,
-        name: provider.name,
-        type: provider.type,
-        testedAt: provider.testedAt,
-        createdAt: provider.createdAt,
-        updatedAt: provider.updatedAt,
-        userId: provider.userId,
-        config: null,
-      };
+      return this.buildView(provider, null);
     }
+  }
+
+  private buildView(provider: StorageProvider, config: unknown | null): StorageProviderView {
+    return {
+      id: provider.id,
+      name: provider.name,
+      type: provider.type,
+      testedAt: provider.testedAt,
+      createdAt: provider.createdAt,
+      updatedAt: provider.updatedAt,
+      userId: provider.userId,
+      config: config as any,
+    };
   }
 }

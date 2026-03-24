@@ -1,5 +1,6 @@
 import { ProviderType } from '@prisma/client';
 import { FtpStorageAdapter } from '@/server/storage/adapters/ftp-storage-adapter';
+import { GoogleDriveStorageAdapter } from '@/server/storage/adapters/google-drive-storage-adapter';
 import { LocalStorageAdapter } from '@/server/storage/adapters/local-storage-adapter';
 import { S3StorageAdapter } from '@/server/storage/adapters/s3-storage-adapter';
 import { SftpStorageAdapter } from '@/server/storage/adapters/sftp-storage-adapter';
@@ -16,6 +17,7 @@ export class StorageAdapterFactory {
       [ProviderType.SMB, new SmbStorageAdapter()],
       [ProviderType.FTP, new FtpStorageAdapter()],
       [ProviderType.SFTP, new SftpStorageAdapter()],
+      [ProviderType.GOOGLE_DRIVE, new GoogleDriveStorageAdapter()],
     ]);
   }
 

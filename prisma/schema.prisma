@@ -19,6 +19,7 @@ enum ProviderType {
   SMB
   FTP
   SFTP
+  GOOGLE_DRIVE
 }
 
 enum BackupRunStatus {

@@ -5,6 +5,7 @@ import type {
   S3ProviderConfig,
   SftpProviderConfig,
   SmbProviderConfig,
+  GoogleDriveProviderConfig,
   StorageProviderConfig,
 } from '@/server/storage/types';
 
@@ -29,6 +30,8 @@ export class StorageConfigRedactor {
         return this.redactFtp(config as FtpProviderConfig);
       case ProviderType.SFTP:
         return this.redactSftp(config as SftpProviderConfig);
+      case ProviderType.GOOGLE_DRIVE:
+        return this.redactGoogleDrive(config as GoogleDriveProviderConfig);
       default:
         throw new Error(`Unsupported storage provider type: ${type}`);
     }
@@ -85,6 +88,15 @@ export class StorageConfigRedactor {
       hasPassword: Boolean(config.password),
       hasPrivateKey: Boolean(config.privateKey),
       hasPassphrase: Boolean(config.passphrase),
+    };
+  }
+
+  private redactGoogleDrive(config: GoogleDriveProviderConfig): Record<string, unknown> {
+    return {
+      clientIdMasked: mask(config.clientId),
+      hasClientSecret: Boolean(config.clientSecret),
+      hasRefreshToken: Boolean(config.refreshToken),
+      folderId: config.folderId,
     };
   }
 }

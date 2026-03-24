@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  vaultdocker:
+    build: .
+    container_name: vaultdocker
+    ports:
+      - "9002:9002"
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_SECRET=changeme-super-secret-key-12345
+      - APP_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      - DATABASE_URL=file:/data/db.sqlite
+      - LOCAL_BACKUP_PATH=/data/backups
+    volumes:
+      - vaultdocker_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  vaultdocker_data:

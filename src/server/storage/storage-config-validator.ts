@@ -10,10 +10,18 @@ import type {
   StorageProviderConfig,
   StorageProviderConfigByType,
   UpdateStorageProviderInput,
+  GoogleDriveProviderConfig,
 } from '@/server/storage/types';
 
 const localSchema = z.object({
   basePath: z.string().min(1),
+});
+
+const googleDriveSchema = z.object({
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1),
+  refreshToken: z.string().min(1),
+  folderId: z.string().optional(),
 });
 
 const s3Schema = z.object({
@@ -93,6 +101,10 @@ export class StorageConfigValidator {
     return sftpSchema.parse(raw);
   }
 
+  parseGoogleDrive(raw: unknown): GoogleDriveProviderConfig {
+    return googleDriveSchema.parse(raw);
+  }
+
   parseForType(type: ProviderType, raw: unknown): StorageProviderConfig {
     switch (type) {
       case ProviderType.LOCAL:
@@ -105,6 +117,8 @@ export class StorageConfigValidator {
         return this.parseFtp(raw);
       case ProviderType.SFTP:
         return this.parseSftp(raw);
+      case ProviderType.GOOGLE_DRIVE:
+        return this.parseGoogleDrive(raw);
       default:
         throw new Error(`Unsupported storage provider type: ${type}`);
     }

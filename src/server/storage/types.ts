@@ -44,12 +44,20 @@ export type SftpProviderConfig = {
   readyTimeoutMs?: number;
 };
 
+export type GoogleDriveProviderConfig = {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+  folderId?: string;
+};
+
 export type StorageProviderConfigByType = {
   [ProviderType.LOCAL]: LocalProviderConfig;
   [ProviderType.S3]: S3ProviderConfig;
   [ProviderType.SMB]: SmbProviderConfig;
   [ProviderType.FTP]: FtpProviderConfig;
   [ProviderType.SFTP]: SftpProviderConfig;
+  [ProviderType.GOOGLE_DRIVE]: GoogleDriveProviderConfig;
 };
 
 export type StorageProviderConfig = StorageProviderConfigByType[ProviderType];
