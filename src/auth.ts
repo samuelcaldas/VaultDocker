@@ -6,6 +6,7 @@ import { bootstrapSystem } from '@/server/bootstrap';
 import { requireEnv } from '@/server/env';
 import { UserRepository } from '@/server/repositories/user-repository';
 import { verifyPassword } from '@/server/auth/password';
+import { authConfig } from './auth.config';
 
 const credentialSchema = z.object({
   email: z.string().email(),
@@ -17,13 +18,7 @@ requireEnv('NEXTAUTH_SECRET');
 const userRepository = new UserRepository();
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret: process.env.NEXTAUTH_SECRET,
-  session: {
-    strategy: 'jwt',
-  },
-  pages: {
-    signIn: '/login',
-  },
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -58,24 +53,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = user.role as Role;
-        token.mustChangePassword = Boolean(user.mustChangePassword);
-      }
-
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as Role;
-        session.user.mustChangePassword = Boolean(token.mustChangePassword);
-      }
-
-      return session;
-    },
-  },
 });

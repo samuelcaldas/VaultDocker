@@ -60,12 +60,12 @@ export async function PATCH(request: NextRequest) {
         return badRequest('currentPassword is required to change password.');
       }
 
-      const valid = await verifyPassword(body.currentPassword, existing.passwordHash);
+      const valid = await verifyPassword(body.currentPassword.trim(), existing.passwordHash);
       if (!valid) {
         return badRequest('Current password is invalid.');
       }
 
-      passwordHash = await hashPassword(body.newPassword);
+      passwordHash = await hashPassword(body.newPassword.trim());
       mustChangePassword = false;
     }
 
