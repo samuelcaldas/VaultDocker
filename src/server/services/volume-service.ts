@@ -1,5 +1,6 @@
 import { existsSync } from 'fs';
 import { readdir, stat } from 'fs/promises';
+import type { Dirent } from 'fs';
 import http from 'http';
 import path from 'path';
 import { VolumeRepository } from '@/server/repositories/volume-repository';
@@ -12,21 +13,20 @@ type DiscoveredVolume = {
   containers: string[];
 };
 
+type DockerVolume = { Name: string; Driver?: string; Mountpoint?: string };
+
 type DockerVolumeResponse = {
-  Volumes?: Array<{
-    Name: string;
-    Driver?: string;
-    Mountpoint?: string;
-  }>;
+  Volumes?: Array<DockerVolume>;
 };
 
-type DockerContainerResponse = Array<{
+type DockerContainerMount = { Name?: string; Type?: string };
+
+type DockerContainer = {
   Names?: string[];
-  Mounts?: Array<{
-    Name?: string;
-    Type?: string;
-  }>;
-}>;
+  Mounts?: Array<DockerContainerMount>;
+};
+
+type DockerContainerResponse = Array<DockerContainer>;
 
 export async function requestDockerSocket<T>(dockerPath: string): Promise<T | null> {
   return new Promise((resolve) => {
@@ -50,7 +50,7 @@ export async function requestDockerSocket<T>(dockerPath: string): Promise<T | nu
   });
 }
 
-function handleSocketEnd(response: http.IncomingMessage, data: string, resolve: (value: any) => void) {
+function handleSocketEnd<T>(response: http.IncomingMessage, data: string, resolve: (value: T | null) => void) {
   if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
     resolve(null);
     return;
@@ -58,9 +58,9 @@ function handleSocketEnd(response: http.IncomingMessage, data: string, resolve: 
   parseSocketData(data, resolve);
 }
 
-function parseSocketData(data: string, resolve: (value: any) => void) {
+function parseSocketData<T>(data: string, resolve: (value: T | null) => void) {
   try {
-    resolve(JSON.parse(data));
+    resolve(JSON.parse(data) as T);
   } catch {
     resolve(null);
   }
@@ -77,7 +77,7 @@ export async function getDirectorySizeBytes(directoryPath: string): Promise<bigi
   return total;
 }
 
-async function getEntrySizeBytes(directoryPath: string, entry: any): Promise<bigint> {
+async function getEntrySizeBytes(directoryPath: string, entry: Dirent): Promise<bigint> {
   const fullPath = path.join(directoryPath, entry.name);
   try {
     if (entry.isDirectory()) {
@@ -145,14 +145,14 @@ function buildContainerMapping(containersPayload: DockerContainerResponse | null
   return volumeToContainers;
 }
 
-function processContainerMounts(container: any, volumeToContainers: Map<string, string[]>) {
+function processContainerMounts(container: DockerContainer, volumeToContainers: Map<string, string[]>) {
   const containerName = container.Names?.[0]?.replace(/^\//, '') ?? 'unknown';
   for (const mount of container.Mounts ?? []) {
     addMountToMapping(mount, containerName, volumeToContainers);
   }
 }
 
-function addMountToMapping(mount: any, containerName: string, volumeToContainers: Map<string, string[]>) {
+function addMountToMapping(mount: DockerContainerMount, containerName: string, volumeToContainers: Map<string, string[]>) {
   if (mount.Type !== 'volume' || !mount.Name) {
     return;
   }
@@ -161,7 +161,7 @@ function addMountToMapping(mount: any, containerName: string, volumeToContainers
   volumeToContainers.set(mount.Name, list);
 }
 
-async function buildSocketVolume(volume: any, volumeToContainers: Map<string, string[]>): Promise<DiscoveredVolume> {
+async function buildSocketVolume(volume: DockerVolume, volumeToContainers: Map<string, string[]>): Promise<DiscoveredVolume> {
   const name = volume.Name;
   const mountedPath = `/mnt/volumes/${name}`;
   const fallbackPath = volume.Mountpoint ?? mountedPath;
@@ -250,7 +250,7 @@ export class VolumeService {
     };
   }
 
-  private async buildTreeEntry(absolutePath: string, sanitizedRelative: string, entry: any) {
+  private async buildTreeEntry(absolutePath: string, sanitizedRelative: string, entry: Dirent) {
     const entryPath = path.join(absolutePath, entry.name);
     let size = 0;
 
@@ -269,7 +269,7 @@ export class VolumeService {
     };
   }
 
-  private sortTreeEntries(payload: any[]) {
+  private sortTreeEntries(payload: { name: string; isDirectory: boolean }[]) {
     payload.sort((a, b) => {
       if (a.isDirectory !== b.isDirectory) {
         return a.isDirectory ? -1 : 1;

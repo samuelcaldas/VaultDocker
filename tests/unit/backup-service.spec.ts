@@ -24,8 +24,8 @@ vi.mock('fs/promises', () => ({
   writeFile: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('fs', () => {
-  const original = importOriginal => importOriginal;
+vi.mock('fs', async () => {
+  const original = await vi.importActual<typeof import('fs')>('fs');
   return {
     ...original,
     createReadStream: vi.fn().mockReturnValue({
@@ -113,7 +113,7 @@ describe('BackupService', () => {
       (service as any).runRepository.findById.mockResolvedValue({ id: 'run1', status: 'SUCCESS' });
       
       const run = await service.runJob('job1');
-      expect(run.status).toBe('SUCCESS');
+      expect(run!.status).toBe('SUCCESS');
     });
   });
 

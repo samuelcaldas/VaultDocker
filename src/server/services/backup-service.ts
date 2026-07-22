@@ -4,14 +4,33 @@ import { mkdir, rm, stat, writeFile } from 'fs/promises';
 import path from 'path';
 import { spawn } from 'child_process';
 import { BackupRunStatus, ProviderType } from '@prisma/client';
+import type { BackupRun, Prisma } from '@prisma/client';
 import type { StorageAdapter } from '@/server/storage/storage-adapter';
-import type { StorageProviderConfig } from '@/server/storage/types';
+import type { StorageProviderConfig, StorageUploadResult } from '@/server/storage/types';
 import { BackupJobRepository } from '@/server/repositories/backup-job-repository';
 import { BackupRunRepository } from '@/server/repositories/backup-run-repository';
 import { StorageProviderService } from '@/server/services/storage-provider-service';
 
 const MAX_ATTEMPTS = 3;
 const TEMP_ARCHIVE_ROOT = process.env.BACKUP_WORKDIR ?? '/tmp/vaultdocker-work';
+
+type JobWithRelations = Prisma.BackupJobGetPayload<{
+  include: { volume: true; storageProvider: true };
+}>;
+
+type SafetyBackupInput = {
+  sourcePath: string;
+  volumeName: string;
+  jobName: string;
+  providerType: ProviderType;
+  storageConfig: StorageProviderConfig;
+};
+
+type JobContext = {
+  adapter: StorageAdapter;
+  storageConfig: StorageProviderConfig;
+  backupName: string;
+};
 
 type RunWorkspace = {
   directoryPath: string;
@@ -172,7 +191,7 @@ export class BackupService {
     return job;
   }
 
-  private async prepareJobContext(job: any) {
+  private async prepareJobContext(job: JobWithRelations) {
     const adapter = this.storageProviderService.getAdapter(job.storageProvider.type);
     const storageConfig = this.storageProviderService.decodeConfig(job.storageProvider);
     const successfulRuns = await this.runRepository.listSuccessfulByJob(job.id);
@@ -187,7 +206,7 @@ export class BackupService {
     return { adapter, storageConfig, backupName };
   }
 
-  private async executeAttempts(job: any, run: any, workspace: RunWorkspace, context: any) {
+  private async executeAttempts(job: JobWithRelations, run: BackupRun, workspace: RunWorkspace, context: JobContext) {
     let combinedLogs = run.logs ?? '';
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -201,7 +220,7 @@ export class BackupService {
     throw new Error('Backup failed after maximum attempts.');
   }
 
-  private async performSingleAttempt(job: any, run: any, workspace: RunWorkspace, context: any, logs: string) {
+  private async performSingleAttempt(job: JobWithRelations, run: BackupRun, workspace: RunWorkspace, context: JobContext, logs: string) {
     const archiveLogs = await this.executeArchiveCommand(job, workspace);
     const updatedLogs = logs + archiveLogs;
     
@@ -214,7 +233,7 @@ export class BackupService {
     return this.runRepository.findById(run.id);
   }
 
-  private async executeArchiveCommand(job: any, workspace: RunWorkspace) {
+  private async executeArchiveCommand(job: JobWithRelations, workspace: RunWorkspace) {
     const selectedPaths = Array.isArray(job.selectedPaths) ? job.selectedPaths.filter((e): e is string => typeof e === 'string') : [];
     const exclusionGlobs = Array.isArray(job.exclusionGlobs) ? job.exclusionGlobs.filter((e): e is string => typeof e === 'string') : [];
 
@@ -227,7 +246,7 @@ export class BackupService {
     });
   }
 
-  private async uploadArtifacts(workspace: RunWorkspace, context: any) {
+  private async uploadArtifacts(workspace: RunWorkspace, context: JobContext) {
     const checksum = await computeSha256(workspace.archivePath);
     await writeFile(workspace.sidecarPath, `${checksum}  ${context.backupName}\n`, 'utf8');
 
@@ -244,7 +263,7 @@ export class BackupService {
     return { ...uploadedArchive, checksum };
   }
 
-  private async markRunSuccess(job: any, run: any, workspace: RunWorkspace, context: any, uploadedArchive: any, logs: string) {
+  private async markRunSuccess(job: JobWithRelations, run: BackupRun, workspace: RunWorkspace, context: JobContext, uploadedArchive: StorageUploadResult & { checksum: string }, logs: string) {
     const fileStat = await stat(workspace.archivePath);
 
     await this.runRepository.update(run.id, {
@@ -261,7 +280,7 @@ export class BackupService {
     await this.jobRepository.update(job.id, { lastRunAt: new Date() });
   }
 
-  private async handleAttemptFailure(error: unknown, attempt: number, run: any, workspace: RunWorkspace, logs: string): Promise<string> {
+  private async handleAttemptFailure(error: unknown, attempt: number, run: BackupRun, workspace: RunWorkspace, logs: string): Promise<string> {
     const message = (error as Error).message;
     const newLogs = logs + `Attempt ${attempt} failed: ${message}\n`;
 
@@ -270,7 +289,7 @@ export class BackupService {
     return newLogs;
   }
 
-  private async delayOrFail(attempt: number, run: any, logs: string, message: string, workspace: RunWorkspace) {
+  private async delayOrFail(attempt: number, run: BackupRun, logs: string, message: string, workspace: RunWorkspace) {
     if (attempt >= MAX_ATTEMPTS) {
       await this.runRepository.update(run.id, {
         status: BackupRunStatus.FAILED,
@@ -285,13 +304,7 @@ export class BackupService {
     await sleep(waitMs);
   }
 
-  async createSafetyBackup(input: {
-    sourcePath: string;
-    volumeName: string;
-    jobName: string;
-    providerType: ProviderType;
-    storageConfig: StorageProviderConfig;
-  }) {
+  async createSafetyBackup(input: SafetyBackupInput) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const safetyName = `safety_${sanitizePathSegment(input.jobName)}_${sanitizePathSegment(input.volumeName)}_${timestamp}.tar.gz`;
     const workspace = createWorkspace(`safety-${randomUUID()}`);
@@ -306,7 +319,7 @@ export class BackupService {
     }
   }
 
-  private async executeSafetyBackup(input: any, workspace: RunWorkspace, safetyName: string) {
+  private async executeSafetyBackup(input: SafetyBackupInput, workspace: RunWorkspace, safetyName: string) {
     await runArchiveCommand({
       sourcePath: input.sourcePath,
       selectedPaths: ['.'],
@@ -365,7 +378,7 @@ export class BackupService {
     }
   }
 
-  private async cleanupStaleRun(stale: any, adapter: StorageAdapter, storageConfig: StorageProviderConfig) {
+  private async cleanupStaleRun(stale: BackupRun, adapter: StorageAdapter, storageConfig: StorageProviderConfig) {
     if (stale.storagePath) {
       await adapter.delete(storageConfig, { remotePath: stale.storagePath }).catch(() => undefined);
       await adapter.delete(storageConfig, { remotePath: `${stale.storagePath}.sha256` }).catch(() => undefined);

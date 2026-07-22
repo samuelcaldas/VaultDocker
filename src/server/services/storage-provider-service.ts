@@ -153,7 +153,7 @@ export class StorageProviderService {
       createdAt: provider.createdAt,
       updatedAt: provider.updatedAt,
       userId: provider.userId,
-      config: config as any,
+      config: config as Record<string, unknown> | null,
     };
   }
 }

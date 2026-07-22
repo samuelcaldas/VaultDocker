@@ -10,8 +10,8 @@ vi.mock('fs/promises', () => ({
   rm: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('fs', () => {
-  const original = importOriginal => importOriginal;
+vi.mock('fs', async () => {
+  const original = await vi.importActual<typeof import('fs')>('fs');
   return {
     ...original,
     createReadStream: vi.fn().mockReturnValue({

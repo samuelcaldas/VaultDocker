@@ -4,12 +4,17 @@ import { access, mkdir, rm } from 'fs/promises';
 import { spawn } from 'child_process';
 import path from 'path';
 import { constants as fsConstants } from 'fs';
+import type { Prisma } from '@prisma/client';
 import { BackupJobRepository } from '@/server/repositories/backup-job-repository';
 import { BackupRunRepository } from '@/server/repositories/backup-run-repository';
 import { BackupService } from '@/server/services/backup-service';
 import { StorageProviderService } from '@/server/services/storage-provider-service';
 
 const TEMP_RESTORE_ROOT = process.env.BACKUP_RESTORE_WORKDIR ?? '/tmp/vaultdocker-work/restore';
+
+type JobWithRelations = Prisma.BackupJobGetPayload<{
+  include: { volume: true; storageProvider: true };
+}>;
 
 type RestoreArchiveLocation = {
   archivePath: string;
@@ -113,7 +118,7 @@ export class RestoreService {
     }
   }
 
-  private async performSafetyBackup(safetyBackup: boolean, job: any) {
+  private async performSafetyBackup(safetyBackup: boolean, job: JobWithRelations) {
     if (!safetyBackup) {
       return;
     }

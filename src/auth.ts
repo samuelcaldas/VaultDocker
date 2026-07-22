@@ -1,6 +1,5 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { Role } from '@prisma/client';
 import { z } from 'zod';
 import { bootstrapSystem } from '@/server/bootstrap';
 import { requireEnv } from '@/server/env';

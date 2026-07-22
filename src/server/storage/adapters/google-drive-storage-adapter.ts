@@ -1,5 +1,6 @@
 import { createReadStream, createWriteStream } from 'fs';
 import { google } from 'googleapis';
+import { ProviderType } from '@prisma/client';
 import type { StorageAdapter } from '../storage-adapter';
 import type {
   GoogleDriveProviderConfig,
@@ -14,6 +15,7 @@ import type {
 } from '../types';
 
 export class GoogleDriveStorageAdapter implements StorageAdapter {
+  readonly type = ProviderType.GOOGLE_DRIVE;
   async testConnection(config: GoogleDriveProviderConfig): Promise<StorageConnectionResult> {
     try {
       const drive = this.getDriveClient(config);
@@ -74,7 +76,7 @@ export class GoogleDriveStorageAdapter implements StorageAdapter {
     return new Promise((resolve, reject) => {
       response.data
         .on('end', () => resolve())
-        .on('error', (err: any) => reject(err))
+        .on('error', (err: Error) => reject(err))
         .pipe(dest);
     });
   }
@@ -94,8 +96,8 @@ export class GoogleDriveStorageAdapter implements StorageAdapter {
         fields: 'id',
       });
       return true;
-    } catch (error: any) {
-      if (error.code === 404) {
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null && 'code' in error && (error as { code: number }).code === 404) {
         return false;
       }
       throw error;
