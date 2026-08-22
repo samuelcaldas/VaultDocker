@@ -37,6 +37,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+.playwright-mcp/
 .genkit/*
 .env*
 !.env.example
