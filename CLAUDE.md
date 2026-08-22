@@ -14,6 +14,7 @@ npm run build        # Production build (skips TS/ESLint — always run lint+typ
 npx vitest run                          # All unit tests
 npx vitest run tests/unit/foo.spec.ts   # Single unit test file
 npx playwright test                     # E2E tests (requires dev server)
+npx playwright test tests/e2e/foo.spec.ts # Single E2E test file
 
 # DB
 npm run prisma:migrate   # Apply migrations (dev)
@@ -22,11 +23,12 @@ npm run prisma:generate  # Regenerate Prisma client after schema changes
 
 # AI flows
 npm run genkit:dev       # Genkit dev tooling
+npm run genkit:watch     # Genkit dev tooling with watch mode
 ```
 
 ## Architecture
 
-**VaultDocker** is a Next.js 15 App Router + TypeScript strict application for managing Docker volume backups.
+**VaultDocker** is a Next.js 15 App Router + TypeScript strict application for managing Docker volume backups. It interacts with the Docker socket (`/var/run/docker.sock`) to discover volumes, orchestrate backup jobs, and generate `.tar.gz` archives with `.sha256` checksum sidecars.
 
 ### Layer Map
 
@@ -39,9 +41,9 @@ src/
     login/               # Unauthenticated login page
   server/
     services/            # BackupService, RestoreService, VolumeService,
-                         #   StorageProviderService, SchedulerService
+                         #   StorageProviderService, SchedulerService (node-cron)
     repositories/        # Prisma wrappers — no direct Prisma usage outside here
-    storage/             # Provider adapters (adapters/), factory, validator, codec
+    storage/             # Provider adapters (Local, S3, SMB, FTP, SFTP, Google Drive), factory, validator, codec
     auth/                # Password hashing
     bootstrap.ts         # Admin seed + default settings on first boot (idempotent)
     crypto.ts            # AES-256-GCM for provider config at rest
@@ -60,9 +62,10 @@ src/
 ### Key Conventions
 
 - **Repository pattern**: all Prisma access goes through `src/server/repositories/`. Service layer calls repositories, never `db` directly.
-- **Storage adapters**: each provider implements `StorageAdapter` interface (`src/server/storage/storage-adapter.ts`). Factory in `storage-adapter-factory.ts` selects adapter by `ProviderType`.
+- **Storage adapters**: each provider implements `StorageAdapter` interface (`src/server/storage/storage-adapter.ts`). Supported providers: `LOCAL`, `S3`, `SMB`, `FTP`, `SFTP`, `GOOGLE_DRIVE`. Factory in `storage-adapter-factory.ts` selects adapter by `ProviderType`.
 - **Provider credentials**: encrypted with AES-256-GCM via `encryptJson`/`decryptJson` before SQLite storage. Key from `APP_ENCRYPTION_KEY` env var.
 - **Auth**: NextAuth v5 Credentials provider, JWT sessions. `mustChangePassword` flag forces redirect on first login. Roles: `ADMIN` (full) | `OPERATOR` (no users/settings).
+- **Scheduling**: `node-cron` jobs managed through `SchedulerService`.
 - **Genkit flows**: each flow file uses `'use server'`, Zod schemas via `genkit` (not `zod` directly), an exported wrapper function, `ai.definePrompt()` + `ai.defineFlow()`.
 - **Imports**: always use `@/*` alias (maps to `./src/*`).
 - **File naming**: `kebab-case.ts(x)`. Components export `PascalCase`. Hooks prefixed `use`.
