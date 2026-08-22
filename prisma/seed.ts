@@ -1,7 +1,9 @@
-import { PrismaClient, ProviderType, Role } from '@prisma/client';
+import 'dotenv/config';
+import { ProviderType, Role } from '@prisma/client';
 import { hash } from 'bcryptjs';
+import { createPrismaClient } from '../src/server/db';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   const adminEmail = process.env.DEFAULT_ADMIN_EMAIL ?? 'admin@vaultdocker.local';

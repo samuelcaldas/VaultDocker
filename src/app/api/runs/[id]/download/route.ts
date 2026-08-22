@@ -35,7 +35,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     if (!sourceArchivePath && run.storagePath) {
       const safeName = ensureTarName(run.backupName ?? `backup-${run.id}`);
       tempDirectory = path.join(TEMP_DOWNLOAD_ROOT, `${run.id}-${randomUUID()}`);
-      sourceArchivePath = path.join(tempDirectory, safeName);
+      sourceArchivePath = path.join(/*turbopackIgnore: true*/ tempDirectory, safeName);
 
       await service.downloadRunToLocal(run.id, sourceArchivePath);
     }
@@ -44,8 +44,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       return notFound('Archive not found for this run.');
     }
 
-    const fileInfo = await stat(sourceArchivePath);
-    const nodeStream = createReadStream(sourceArchivePath);
+    const fileInfo = await stat(/*turbopackIgnore: true*/ sourceArchivePath);
+    const nodeStream = createReadStream(/*turbopackIgnore: true*/ sourceArchivePath);
     const cleanupDir = tempDirectory;
 
     if (cleanupDir) {

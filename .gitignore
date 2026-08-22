@@ -40,7 +40,10 @@ next-env.d.ts
 .genkit/*
 .env*
 !.env.example
+*.db*
+prisma/*.db*
 prisma/dev.db*
+prisma/e2e.db*
 
 # firebase
 firebase-debug.log

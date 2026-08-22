@@ -4,9 +4,10 @@ import path from 'path';
 export default defineConfig({
   test: {
     environment: 'node',
-    exclude: ['node_modules', 'tests/e2e/**'],
+    include: ['tests/unit/**/*.{test,spec}.ts'],
+    exclude: ['node_modules', '.next/**', 'tests/e2e/**'],
     alias: {
-      '@': path.resolve(__dirname, './src')
+      '@': path.resolve(import.meta.dirname, './src')
     }
   }
 });

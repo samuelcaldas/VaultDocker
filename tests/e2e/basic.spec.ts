@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-test('has title and login redirect', async ({ page }) => {
+test('unauthenticated root request redirects to login page', async ({ page }) => {
   await page.goto('/');
-  // Should redirect to login or show the dashboard
-  await expect(page).toHaveURL(/.*login|.*dashboard|\//);
+  await expect(page).toHaveURL(/.*login/);
+  await expect(page.locator('body')).toBeVisible();
 });

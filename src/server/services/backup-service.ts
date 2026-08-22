@@ -130,7 +130,7 @@ export async function runArchiveCommand(input: {
 }
 
 export function createWorkspace(id: string): RunWorkspace {
-  const directoryPath = path.join(TEMP_ARCHIVE_ROOT, id);
+  const directoryPath = path.join(/*turbopackIgnore: true*/ TEMP_ARCHIVE_ROOT, id);
   const archivePath = path.join(directoryPath, 'archive.tar.gz');
 
   return {

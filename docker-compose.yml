@@ -10,7 +10,7 @@ services:
       - NODE_ENV=production
       - NEXTAUTH_SECRET=changeme-super-secret-key-12345
       - APP_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-      - DATABASE_URL=file:/data/db.sqlite
+      - DATABASE_URL=file:/data/dev.db
       - LOCAL_BACKUP_PATH=/data/backups
     volumes:
       - vaultdocker_data:/data

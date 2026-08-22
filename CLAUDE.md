@@ -18,7 +18,7 @@ npx playwright test tests/e2e/foo.spec.ts # Single E2E test file
 
 # DB
 npm run prisma:migrate   # Apply migrations (dev)
-npm run prisma:seed      # Seed admin user + default settings
+npm run prisma:seed      # Seed admin user + default settings (prisma db seed)
 npm run prisma:generate  # Regenerate Prisma client after schema changes
 
 # AI flows
@@ -28,7 +28,7 @@ npm run genkit:watch     # Genkit dev tooling with watch mode
 
 ## Architecture
 
-**VaultDocker** is a Next.js 15 App Router + TypeScript strict application for managing Docker volume backups. It interacts with the Docker socket (`/var/run/docker.sock`) to discover volumes, orchestrate backup jobs, and generate `.tar.gz` archives with `.sha256` checksum sidecars.
+**VaultDocker** is a Next.js 16 App Router + TypeScript strict application for managing Docker volume backups. It interacts with the Docker socket (`/var/run/docker.sock`) to discover volumes, orchestrate backup jobs, and generate `.tar.gz` archives with `.sha256` checksum sidecars.
 
 ### Layer Map
 
@@ -54,7 +54,7 @@ src/
     genkit.ts            # Shared Genkit instance (googleai/gemini-2.5-flash)
   auth.config.ts         # NextAuth JWT + session callbacks (no providers here)
   auth.ts                # NextAuth with Credentials provider
-  middleware.ts          # Protects all non-auth routes
+  proxy.ts               # Protects all non-auth routes (Next.js 16 Proxy)
   components/ui/         # shadcn/ui Radix primitives
   components/layout/     # Navbar, Sidebar shell components
 ```
@@ -69,7 +69,7 @@ src/
 - **Genkit flows**: each flow file uses `'use server'`, Zod schemas via `genkit` (not `zod` directly), an exported wrapper function, `ai.definePrompt()` + `ai.defineFlow()`.
 - **Imports**: always use `@/*` alias (maps to `./src/*`).
 - **File naming**: `kebab-case.ts(x)`. Components export `PascalCase`. Hooks prefixed `use`.
-- **Styling**: Tailwind + HSL CSS variables from `globals.css`. Use `cn()` from `@/lib/utils`. Monospace via `.font-code`.
+- **Styling**: Tailwind CSS 4 + HSL CSS variables from `globals.css`. Use `cn()` from `@/lib/utils`. Monospace via `.font-code`.
 
 ### Required Environment Variables
 
